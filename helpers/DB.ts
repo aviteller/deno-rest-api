@@ -5,48 +5,71 @@ import { dbCreds } from "../config.ts";
 const client = new Client(dbCreds);
 
 class DB {
+  sortBy = (queryParams: any): string => {
+    let { sort } = queryParams;
+    let retrunStr: string = "";
+    if (sort !== undefined) {
+      if (sort.charAt(0) === "-") {
+        retrunStr = ` ORDER BY ${sort.substring(1)} DESC`;
+      } else {
+        retrunStr = ` ORDER BY ${sort} ASC`;
+      }
+    } else {
+      ` ORDER BY created_at ASC `;
+    }
+    return retrunStr;
+  };
+
+  totalRows = async (model: any, serachStr?: string) => {
+    let returnNo: number = 0;
+
+    const { rows } = await client.query(
+      `SELECT COUNT(*) FROM ${model}s ${serachStr}`
+    );
+
+    returnNo = +rows;
+
+    return returnNo;
+  };
+
+  searchBy = (queryParams: any): string => {
+    let { search } = queryParams;
+    let returnStr: string = "";
+    if (search !== undefined) {
+      returnStr = " AND ";
+
+      let searchParams = search.split("|");
+      let searchFields: Array<string> = searchParams[1].split(",");
+      let searchValue = searchParams[0];
+      let arrLen = searchFields.length;
+
+      searchFields.forEach((s, i) => {
+        returnStr += ` CAST(${s} as TEXT) ILIKE '%${searchValue}%' `;
+        if (i + 1 < arrLen) returnStr += " OR ";
+      });
+    }
+
+    return returnStr;
+  };
+
   getAll = async (model: any, queryParams?: any) => {
     let response: any = new Object();
 
-    let { page, limit, sort, select, search } = queryParams;
+    let { page, limit, select } = queryParams;
 
     try {
       await client.connect();
 
       let startPage: number = 1;
       let pageLimit: number = 10;
-      let sortBy: string = "id";
-      let selectFields: string = "*";
-      let orderBy: string = "";
-      let searchBy: string = "";
-      let searchByString: string = "";
       let limitQuery = "";
+      let deleted = "is";
+      const orderBy: string = await this.sortBy(queryParams);
+      const searchByString: string = await this.searchBy(queryParams);
+      const selectFields: string = select === undefined ? "*" : select;
 
       if (page !== undefined) startPage = page;
       if (limit !== undefined) pageLimit = limit;
-      if (sort !== undefined) sortBy = sort;
-      if (select !== undefined) selectFields = select;
-      if (search !== undefined) searchBy = search;
-
-      if (searchBy !== "") {
-        searchByString = "WHERE ";
-  
-        let searchParams = searchBy.split("|");
-        let searchFields = searchParams[1].split(",");
-        let searchValue = searchParams[0];
-        let arrLen = searchFields.length;
-
-        searchFields.forEach((s, i) => {
-          searchByString += ` CAST(${s} as TEXT) ILIKE '%${searchValue}%' `;
-          if (i+1 < arrLen) searchByString += " OR ";
-        });
-      }
-
-      if (sortBy.charAt(0) === "-") {
-        orderBy = ` ORDER BY ${sortBy.substring(1)} DESC`;
-      } else {
-        orderBy = ` ORDER BY ${sortBy} ASC`;
-      }
 
       const offset = (startPage - 1) * pageLimit;
       const endIndex = startPage * pageLimit;
@@ -57,7 +80,7 @@ class DB {
         limitQuery = `LIMIT 500`;
       }
 
-      const finalQuery = `SELECT ${selectFields} FROM ${model}s ${searchByString} ${orderBy} ${limitQuery}`;
+      const finalQuery = `SELECT ${selectFields} FROM ${model}s WHERE deleted_at ${deleted} null ${searchByString} ${orderBy} ${limitQuery}`;
 
       const result = await client.query(finalQuery);
 
@@ -66,17 +89,14 @@ class DB {
 
       result.rows.map((p) => {
         let obj: any = new Object();
-
         result.rowDescription.columns.map((el, i) => (obj[el.name] = p[i]));
         resultsArray.push(obj);
       });
 
       resObj.count = result.rowCount;
       if (limit !== "all") {
-        const { rows } = await client.query(
-          `SELECT COUNT(*) FROM ${model}s ${searchByString}`
-        );
-        let total = +rows;
+        let total = await this.totalRows(model, searchByString);
+
         if (startPage != 1) resObj.prevPage = startPage - 1;
         resObj.currentPage = +startPage;
         resObj.totalPages = Math.ceil(total / pageLimit);
@@ -87,6 +107,7 @@ class DB {
         }
       }
       resObj.rows = resultsArray;
+
       response.staus = 200;
       response.body = {
         success: true,
@@ -168,7 +189,7 @@ class DB {
 
       const updatedQuery = `UPDATE ${model}s SET ${updatedColumns.join(
         ","
-      )} WHERE id = ${id} RETURNING *`;
+      )}, updated_at = CURRENT_TIMESTAMP WHERE id = ${id} RETURNING *`;
 
       try {
         await client.connect();
@@ -275,11 +296,15 @@ class DB {
     } else {
       try {
         await client.connect();
-
-        const result = await client.query(
-          `DELETE FROM products WHERE id = $1`,
-          id
-        );
+        // check for deleted flag if deleted flag then perma delete
+        if (res.body.data.deleted_at == null) {
+          await client.query(
+            `UPDATE products SET deleted_at = CURRENT_TIMESTAMP WHERE id = $1`,
+            id
+          );
+        } else {
+          await client.query(`DELETE FROM products WHERE id = $1`, id);
+        }
 
         response.status = 200;
         response.body = {

@@ -19,7 +19,7 @@ export class ProductModel extends DB {
     this.description = description;
     this.price = price;
   }
-
+//make function in higher class
   validate(values: any) {
     if ("name" in values && "price" in values && "description" in values) {
       return true;
