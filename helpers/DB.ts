@@ -20,11 +20,17 @@ class DB {
     return retrunStr;
   };
 
-  totalRows = async (model: any, serachStr?: string) => {
+  totalRows = async (model: any, serachStr: string, deleted?: boolean) => {
     let returnNo: number = 0;
 
     const { rows } = await client.query(
-      `SELECT COUNT(*) FROM ${model}s ${serachStr}`
+      `SELECT COUNT(*) FROM ${model}s
+       WHERE 
+          CASE WHEN ${deleted} THEN
+               deleted_at is not null ${serachStr.replace("OR", "AND")}
+               ELSE
+               deleted_at is null ${serachStr}
+          END`
     );
 
     returnNo = +rows;
@@ -52,40 +58,61 @@ class DB {
     return returnStr;
   };
 
+  getDeleted = (queryParams: any): boolean => {
+    let { deleted } = queryParams;
+    if (deleted !== undefined) return true;
+    else return false;
+  };
+
+  getPageAndLimit = (
+    queryParams: any
+  ): {
+    page: number;
+    limit: any;
+
+    endIndex: number;
+    pageStr: string;
+  } => {
+    let { page, limit } = queryParams;
+    const returnObj: any = new Object();
+    const startPage: number = page !== undefined ? page : 1;
+    const pageLimit: number = limit !== undefined ? limit : 10;
+
+    // const startIndex = (startPage - 1) * pageLimit;
+    // const endIndex = startPage * pageLimit;
+    let startIndex = (startPage - 1) * pageLimit;
+    returnObj.endIndex = startPage * pageLimit;
+    returnObj.page = startPage;
+    returnObj.limit = pageLimit;
+    if (limit !== "max") {
+      returnObj.pageStr = `LIMIT ${pageLimit} OFFSET ${startIndex}`;
+    } else {
+      returnObj.pageStr = `LIMIT 500`;
+    }
+
+    return returnObj;
+  };
+
   getAll = async (model: any, queryParams?: any) => {
     let response: any = new Object();
 
-    let { page, limit, select } = queryParams;
+    let { select } = queryParams;
 
     try {
       await client.connect();
 
-      let startPage: number = 1;
-      let pageLimit: number = 10;
-      let limitQuery = "";
-      let deleted = "is";
       const orderBy: string = await this.sortBy(queryParams);
       const searchByString: string = await this.searchBy(queryParams);
       const selectFields: string = select === undefined ? "*" : select;
+      const deleted = (await this.getDeleted(queryParams)) ? "is not" : "is";
+      const pageAndLimitObject = await this.getPageAndLimit(queryParams);
 
-      if (page !== undefined) startPage = page;
-      if (limit !== undefined) pageLimit = limit;
-
-      const offset = (startPage - 1) * pageLimit;
-      const endIndex = startPage * pageLimit;
-
-      if (limit !== "all") {
-        limitQuery = `LIMIT ${pageLimit} OFFSET ${offset}`;
-      } else {
-        limitQuery = `LIMIT 500`;
-      }
-
-      const finalQuery = `SELECT ${selectFields} FROM ${model}s WHERE deleted_at ${deleted} null ${searchByString} ${orderBy} ${limitQuery}`;
+      const finalQuery = `SELECT ${selectFields} FROM ${model}s WHERE deleted_at ${deleted} null ${searchByString} ${orderBy} ${pageAndLimitObject.pageStr}`;
 
       const result = await client.query(finalQuery);
 
       const resObj: any = new Object();
-      let resultsArray: any = new Array();
+      const resultsArray: Array<Object> = new Array();
 
       result.rows.map((p) => {
         let obj: any = new Object();
@@ -93,19 +120,14 @@ class DB {
         resultsArray.push(obj);
       });
 
+      const total = await this.totalRows(
+        model,
+        searchByString,
+        await this.getDeleted(queryParams)
+      );
+
+      resObj.pagination = await this.pagination(pageAndLimitObject, total);
       resObj.count = result.rowCount;
-      if (limit !== "all") {
-        let total = await this.totalRows(model, searchByString);
-
-        if (startPage != 1) resObj.prevPage = startPage - 1;
-        resObj.currentPage = +startPage;
-        resObj.totalPages = Math.ceil(total / pageLimit);
-        resObj.totalRows = total;
-
-        if (endIndex < total) {
-          resObj.nextPage = +startPage + 1;
-        }
-      }
       resObj.rows = resultsArray;
 
       response.staus = 200;
@@ -124,6 +146,30 @@ class DB {
     }
 
     return response;
+  };
+
+  pagination = (
+    pageObj: {
+      page: number;
+      limit: any;
+      endIndex: number;
+      pageStr: string;
+    },
+    total: number
+  ): Object => {
+    const returnObj: any = new Object();
+    if (pageObj.limit !== "max") {
+      if (pageObj.page != 1) returnObj.prevPage = pageObj.page - 1;
+      returnObj.currentPage = +pageObj.page;
+      returnObj.totalPages = Math.ceil(total / pageObj.limit);
+      returnObj.totalRows = total;
+
+      if (pageObj.endIndex < total) {
+        returnObj.nextPage = +pageObj.page + 1;
+      }
+    }
+
+    return returnObj;
   };
 
   getOne = async (model: any, id: string) => {
