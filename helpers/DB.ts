@@ -5,6 +5,8 @@ import { dbCreds } from "../config.ts";
 const client = new Client(dbCreds);
 
 class DB {
+  table?: string;
+
   sortBy = (queryParams: any): string => {
     let { sort } = queryParams;
     let retrunStr: string = "";
@@ -20,11 +22,11 @@ class DB {
     return retrunStr;
   };
 
-  totalRows = async (model: any, serachStr: string, deleted?: boolean) => {
+  totalRows = async (serachStr: string, deleted?: boolean) => {
     let returnNo: number = 0;
 
     const { rows } = await client.query(
-      `SELECT COUNT(*) FROM ${model}s
+      `SELECT COUNT(*) FROM ${this.table}
        WHERE 
           CASE WHEN ${deleted} THEN
                deleted_at is not null ${serachStr.replace("OR", "AND")}
@@ -69,7 +71,6 @@ class DB {
   ): {
     page: number;
     limit: any;
-
     endIndex: number;
     pageStr: string;
   } => {
@@ -93,7 +94,7 @@ class DB {
     return returnObj;
   };
 
-  getAll = async (model: any, queryParams?: any) => {
+  getAll = async (queryParams?: any) => {
     let response: any = new Object();
 
     let { select } = queryParams;
@@ -102,16 +103,21 @@ class DB {
       await client.connect();
 
       const orderBy: string = await this.sortBy(queryParams);
+
       const searchByString: string = await this.searchBy(queryParams);
+
       const selectFields: string = select === undefined ? "*" : select;
+
       const deleted = (await this.getDeleted(queryParams)) ? "is not" : "is";
+
       const pageAndLimitObject = await this.getPageAndLimit(queryParams);
 
-      const finalQuery = `SELECT ${selectFields} FROM ${model}s WHERE deleted_at ${deleted} null ${searchByString} ${orderBy} ${pageAndLimitObject.pageStr}`;
+      const finalQuery = `SELECT ${selectFields} FROM ${this.table} WHERE deleted_at ${deleted} null ${searchByString} ${orderBy} ${pageAndLimitObject.pageStr}`;
 
       const result = await client.query(finalQuery);
 
       const resObj: any = new Object();
+
       const resultsArray: Array<Object> = new Array();
 
       result.rows.map((p) => {
@@ -121,7 +127,6 @@ class DB {
       });
 
       const total = await this.totalRows(
-        model,
         searchByString,
         await this.getDeleted(queryParams)
       );
@@ -172,13 +177,13 @@ class DB {
     return returnObj;
   };
 
-  getOne = async (model: any, id: string) => {
+  getOne = async (id: string) => {
     let response: any = new Object();
     try {
       await client.connect();
 
       const result = await client.query(
-        `SELECT * FROM ${model}s WHERE id = $1`,
+        `SELECT * FROM ${this.table} WHERE id = $1`,
         id
       );
 
@@ -213,9 +218,88 @@ class DB {
     return response;
   };
 
-  updateOne = async (model: any, values: any, id: string) => {
+  getOneByValue = async (field: string, value: string) => {
     let response: any = new Object();
-    let res = await this.getOne(model, id);
+    try {
+      await client.connect();
+
+      const result = await client.query(
+        `SELECT * FROM ${this.table} WHERE ${field} = $1 AND deleted_at is null`,
+        value
+      );
+
+      if (result.rows.toString() === "") {
+        response.status = 404;
+        response.body = {
+          success: false,
+          msg: "No data found",
+        };
+        return response;
+      } else {
+        const resObj: any = new Object();
+        result.rows.map((p) =>
+          result.rowDescription.columns.map((el, i) => (resObj[el.name] = p[i]))
+        );
+        response.status = 200;
+        response.body = {
+          success: true,
+          data: resObj,
+        };
+      }
+    } catch (error) {
+      response.status = 500;
+      response.body = {
+        success: false,
+        msg: error.toString(),
+      };
+    } finally {
+      await client.end();
+    }
+
+    return response;
+  };
+
+  customQuery = async (query: string) => {
+    let response: any = new Object();
+    try {
+      await client.connect();
+
+      const result = await client.query(query);
+
+      if (result.rows.toString() === "") {
+        response.status = 404;
+        response.body = {
+          success: false,
+          msg: "No data found",
+        };
+        return response;
+      } else {
+        const resObj: any = new Object();
+        result.rows.map((p) =>
+          result.rowDescription.columns.map((el, i) => (resObj[el.name] = p[i]))
+        );
+        response.status = 200;
+        response.body = {
+          success: true,
+          data: resObj,
+        };
+      }
+    } catch (error) {
+      response.status = 500;
+      response.body = {
+        success: false,
+        msg: error.toString(),
+      };
+    } finally {
+      await client.end();
+    }
+
+    return response;
+  };
+
+  updateOne = async (values: any, id: string) => {
+    let response: any = new Object();
+    let res = await this.getOne(id);
     if (res.status === 404) {
       response.status = 404;
       response.body = {
@@ -233,7 +317,7 @@ class DB {
         updatedValues.push(values[v]);
       }
 
-      const updatedQuery = `UPDATE ${model}s SET ${updatedColumns.join(
+      const updatedQuery = `UPDATE ${this.table} SET ${updatedColumns.join(
         ","
       )}, updated_at = CURRENT_TIMESTAMP WHERE id = ${id} RETURNING *`;
 
@@ -274,7 +358,7 @@ class DB {
     }
   };
 
-  addOne = async (model: any, values: any) => {
+  addOne = async (values: any) => {
     let response: any = new Object();
     const insertColumns = new Array();
     const insertValues = new Array();
@@ -287,7 +371,7 @@ class DB {
       insertPlaceholder.push(`$${i++}`);
     }
 
-    const insertQuery = `INSERT INTO ${model}s(${insertColumns.join(
+    const insertQuery = `INSERT INTO ${this.table}(${insertColumns.join(
       ","
     )}) VALUES(${insertPlaceholder}) RETURNING *`;
 
@@ -329,9 +413,9 @@ class DB {
     return response;
   };
 
-  deleteOne = async (model: any, id: string) => {
+  deleteOne = async (id: string) => {
     let response: any = new Object();
-    let res = await this.getOne(model, id);
+    let res = await this.getOne(id);
     if (res.status === 404) {
       response.status = 404;
       response.body = {
@@ -345,17 +429,17 @@ class DB {
         // check for deleted flag if deleted flag then perma delete
         if (res.body.data.deleted_at == null) {
           await client.query(
-            `UPDATE products SET deleted_at = CURRENT_TIMESTAMP WHERE id = $1`,
+            `UPDATE ${this.table} SET deleted_at = CURRENT_TIMESTAMP WHERE id = $1`,
             id
           );
         } else {
-          await client.query(`DELETE FROM products WHERE id = $1`, id);
+          await client.query(`DELETE FROM ${this.table} WHERE id = $1`, id);
         }
 
         response.status = 200;
         response.body = {
           success: true,
-          msg: `${model} with id ${id} Removed`,
+          msg: `${this.table} with id ${id} Removed`,
         };
       } catch (error) {
         response.status = 500;

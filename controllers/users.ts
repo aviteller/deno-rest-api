@@ -1,176 +1,39 @@
+import { IUser, User } from "../models/users.ts";
+import { helpers } from "https://deno.land/x/oak/mod.ts";
 
-import { Client } from "https://deno.land/x/postgres/mod.ts";
-import { User } from "../models/users.ts";
-import { dbCreds } from "../config.ts";
-
-//init client
-const client = new Client(dbCreds);
+const userModel = new User();
 
 
-// @desc Get All Users
-// @ route GET /api/v1/users
+export class UserController {
+  // @desc Get All Users
+  // @ route GET /api/v1/users
+  getUsers = async (ctx: any) => {
+    let queryParams = helpers.getQuery(ctx);
+    let results = await userModel.getUsers(queryParams);
+    ctx.response.status = results.status;
+    ctx.response.body = results.body;
+  };
 
-const getUsers = async ({ response }: { response: any }) => {
-  try {
-    await client.connect();
+  // @desc Get Single Users
+  // @ route GET /api/v1/users/:id
 
-    const result = await client.query("SELECT * FROM users");
+  getUser = async ({
+    params,
+    response,
+  }: {
+    params: { id: string };
+    response: any;
+  }) => {
+    let results = await userModel.getUser(params.id);
+    response.status = results.status;
+    response.body = results.body;
+  };
 
-    const users = new Array();
-
-    result.rows.map((p) => {
-      let obj: any = new Object();
-
-      result.rowDescription.columns.map((el, i) => (obj[el.name] = p[i]));
-
-      users.push(obj);
-    });
-
-    response.body = {
-      success: true,
-      data: users,
-    };
-  } catch (error) {
-    response.status = 500;
-    response.body = {
-      success: false,
-      msg: error.toString(),
-    };
-  } finally {
-    await client.end();
-  }
-};
-
-// @desc Get Single Products
-// @ route GET /api/v1/products/:id
-
-const getProduct = async ({
-  params,
-  response,
-}: {
-  params: { id: string };
-  response: any;
-}) => {
-  try {
-    await client.connect();
-
-    const result = await client.query(
-      "SELECT * FROM products WHERE id = $1",
-      params.id
-    );
-
-    if (result.rows.toString() === "") {
-      response.status = 404;
-      response.body = {
-        success: false,
-        msg: "No data found",
-      };
-      return;
-    } else {
-      const product: Product | any = new Object();
-      result.rows.map((p) =>
-        result.rowDescription.columns.map((el, i) => (product[el.name] = p[i]))
-      );
-
-      response.body = {
-        success: true,
-        data: product,
-      };
-    }
-
-    // const products = new Array();
-
-    // result.rows.map((p) => {
-    //   let obj: any = new Object();
-
-    //   result.rowDescription.columns.map((el, i) => (obj[el.name] = p[i]));
-
-    //   products.push(obj);
-    // });
-  } catch (error) {
-    response.status = 500;
-    response.body = {
-      success: false,
-      msg: error.toString(),
-    };
-  } finally {
-    await client.end();
-  }
-};
-
-// @desc Add Products
-// @ route POST /api/v1/products
-
-const addProduct = async ({
-  request,
-  response,
-}: {
-  request: any;
-  response: any;
-}) => {
-  const body = await request.body();
-
-  if (!request.hasBody) {
-    response.status = 400;
-    response.body = {
-      success: false,
-      msg: "No data found",
-    };
-  } else {
-    try {
-      await client.connect();
-      const product: Product = body.value;
-      const result = await client.query(
-        `INSERT INTO products(name,description,price) VALUES($1,$2,$3)`,
-        product.name,
-        product.description,
-        product.price
-      );
-      // product.id = v4.generate();
-      // products.push(product);
-
-      response.status = 201;
-      response.body = {
-        success: true,
-        data: product,
-      };
-    } catch (error) {
-      response.status = 500;
-      response.body = {
-        success: false,
-        msg: error.toString(),
-      };
-    } finally {
-      await client.end();
-    }
-  }
-};
-
-// @desc update Products
-// @ route PUT /api/v1/products/:id
-
-const updateProduct = async ({
-  params,
-  request,
-  response,
-}: {
-  params: { id: string };
-  request: any;
-  response: any;
-}) => {
-  await getProduct({ params: { id: params.id }, response });
-  if (response.status === 404) {
-    response.status = 404;
-    response.body = {
-      success: false,
-      msg: response.body.msg,
-    };
-    return;
-  } else {
+  // @desc Add Users
+  // @ route POST /api/v1/users
+  addUser = async ({ request, response }: { request: any; response: any }) => {
+    // console.log(body.value);
     const body = await request.body();
-    const updateData: { name?: string; description?: string; price?: number } =
-      body.value;
-
     if (!request.hasBody) {
       response.status = 400;
       response.body = {
@@ -178,79 +41,66 @@ const updateProduct = async ({
         msg: "No data found",
       };
     } else {
-      try {
-        await client.connect();
-        const product: Product = body.value;
-        const result = await client.query(
-          `UPDATE products SET name=$1, description=$2, price=$3 WHERE id = $4`,
-          product.name,
-          product.description,
-          product.price,
-          params.id
-        );
-
-        response.status = 201;
-        response.body = {
-          success: true,
-          data: product,
+      if (await userModel.validate(body.value)) {
+        const { name, email, password, role } = body.value;
+        const user: IUser = {
+          name,
+          email,
+          password,
+          role,
         };
-      } catch (error) {
-        response.status = 500;
+
+        let result = await userModel.addUser(user);
+        response.status = result.status;
+        response.body = result.body;
+      } else {
+        response.status = 404;
         response.body = {
           success: false,
-          msg: error.toString(),
+          msg: "Please enter all required values",
         };
-      } finally {
-        await client.end();
       }
     }
-  }
-};
+  };
 
-// @desc Delete Product
-// @ route DELETE  /api/v1/products/:id
+  // @desc update Users
+  // @ route PUT /api/v1/users/:id
 
-const deleteProduct = async ({
-  params,
-  response,
-}: {
-  params: { id: string };
-  response: any;
-}) => {
-  await getProduct({ params: { id: params.id }, response });
-  if (response.status === 404) {
-    response.status = 404;
-    response.body = {
-      success: false,
-      msg: response.body.msg,
-    };
-    return;
-  } else {
-    try {
-      await client.connect();
-
-      const result = await client.query(
-        `DELETE FROM products WHERE id = $1`,
-        params.id
-      );
-      // product.id = v4.generate();
-      // products.push(product);
-
-      response.status = 200;
-      response.body = {
-        success: true,
-        msg: `Product Removed`,
-      };
-    } catch (error) {
-      response.status = 500;
+  updateUser = async ({
+    params,
+    request,
+    response,
+  }: {
+    params: { id: string };
+    request: any;
+    response: any;
+  }) => {
+    const body = await request.body();
+    if (!request.hasBody) {
+      response.status = 400;
       response.body = {
         success: false,
-        msg: error.toString(),
+        msg: "No data found",
       };
-    } finally {
-      await client.end();
+    } else {
+      let result = await userModel.updateUser(body.value, params.id);
+      response.status = result.status;
+      response.body = result.body;
     }
-  }
-};
+  };
 
-export { getProducts, getProduct, addProduct, updateProduct, deleteProduct };
+  // @desc Delete User
+  // @ route DELETE  /api/v1/users/:id
+
+  deleteUser = async ({
+    params,
+    response,
+  }: {
+    params: { id: string };
+    response: any;
+  }) => {
+    let results = await userModel.deleteUser(params.id);
+    response.status = results.status;
+    response.body = results.body;
+  };
+}

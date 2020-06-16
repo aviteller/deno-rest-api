@@ -7,6 +7,7 @@
     "start": {
       "cmd": "deno run server.ts",
       "allow": ["env", "net", "read"],
+      "unstable": true,
       "env": {
         "PORT": "5000"
       }

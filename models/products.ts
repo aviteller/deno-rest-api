@@ -29,17 +29,17 @@ export class ProductModel extends DB {
   }
 
   async getProduct(id: any) {
-    return await this.getOne("product", id);
+    return await this.getOne( id);
   }
 
   async getProducts(queryParams: any) {
-    return await this.getAll("product", queryParams);
+    return await this.getAll(queryParams);
   }
 
   async addProduct(values: any) {
     // let validated = await this.validate(values);
     if (this.validate(values)) {
-      return await this.addOne("product", values);
+      return await this.addOne(values);
     } else {
       let response: any = new Object();
       response.status = 404;
@@ -52,10 +52,10 @@ export class ProductModel extends DB {
   }
 
   async updateProduct(values: any, id: any) {
-    return await this.updateOne("product", values, id);
+    return await this.updateOne(values, id);
   }
 
   async deleteProduct(id: any) {
-    return await this.deleteOne("product", id);
+    return await this.deleteOne(id);
   }
 }

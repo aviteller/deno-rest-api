@@ -7,6 +7,12 @@ import {
   deleteProduct,
 } from "../controllers/products.ts";
 
+import {
+  UserController,
+} from "../controllers/users.ts";
+const userController = new UserController();
+
+import { register, login } from "../controllers/auth.ts";
 const router = new Router();
 
 router
@@ -17,10 +23,14 @@ router
   .delete("/api/v1/products/:id", deleteProduct);
 
 router
-  .get("/api/v1/users", getProducts)
-  .get("/api/v1/users/:id", getProduct)
-  .post("/api/v1/users", addProduct)
-  .put("/api/v1/users/:id", updateProduct)
-  .delete("/api/v1/users/:id", deleteProduct);
+  .get("/api/v1/users", userController.getUsers)
+  .get("/api/v1/users/:id", userController.getUser)
+  .post("/api/v1/users", userController.addUser)
+  .put("/api/v1/users/:id", userController.updateUser)
+  .delete("/api/v1/users/:id", userController.deleteUser);
+
+router
+  .post("/api/v1/auth/register", register)
+  .post("/api/v1/auth/login", login);
 
 export default router;
