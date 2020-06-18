@@ -3,13 +3,13 @@ import { helpers } from "https://deno.land/x/oak/mod.ts";
 
 const userModel = new User();
 
-
 export class UserController {
   // @desc Get All Users
   // @ route GET /api/v1/users
   getUsers = async (ctx: any) => {
     let queryParams = helpers.getQuery(ctx);
     let results = await userModel.getUsers(queryParams);
+    
     ctx.response.status = results.status;
     ctx.response.body = results.body;
   };
@@ -50,9 +50,19 @@ export class UserController {
           role,
         };
 
-        let result = await userModel.addUser(user);
-        response.status = result.status;
-        response.body = result.body;
+        const userExists = await userModel.getUserByValue("email", email);
+
+        if (userExists.body.success === true) {
+          response.status = 404;
+          response.body = {
+            success: false,
+            msg: `User with email: ${email} already exists`,
+          };
+        } else {
+          let result = await userModel.addUser(user);
+          response.status = result.status;
+          response.body = result.body;
+        }
       } else {
         response.status = 404;
         response.body = {

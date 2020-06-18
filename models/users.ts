@@ -6,7 +6,7 @@ import {
   Jose,
   Payload,
 } from "https://deno.land/x/djwt/create.ts";
-import { JwtConfig } from "../middleware/jwt.ts";
+import { validJwt } from "../middleware/jwt.ts";
 
 export interface IUser {
   id?: string;
@@ -45,6 +45,9 @@ export class User extends DB {
   }
 
   async getUsers(queryParams: any) {
+    if (queryParams.select == undefined)
+      queryParams.select = "id,name,email,role,created_at";
+
     return await this.getAll(queryParams);
   }
 

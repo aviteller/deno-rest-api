@@ -1,5 +1,5 @@
-import { User } from "../models/users.ts";
-// import { helpers } from "https://deno.land/x/oak/mod.ts";
+import { User, IUser } from "../models/users.ts";
+import { createToken } from "../util/token.ts";
 
 const userModel = new User();
 
@@ -28,8 +28,10 @@ const register = async ({
 
     if (userExists.body.success === false) {
       let result = await userModel.addUser(body.value);
+      const newUser: IUser = result.body.data;
+      const jsonToken = await createToken(newUser);
       response.status = result.status;
-      response.body = result.body;
+      response.body = { success: true, data: jsonToken };
     } else {
       response.status = 409;
       response.body = {
@@ -68,10 +70,12 @@ const login = async ({
       let isMatch = await userModel.passwordMatch(password, user.password);
 
       if (isMatch) {
+        const jsonToken = await createToken(user);
+
         response.status = 200;
         response.body = {
           success: true,
-          data: user,
+          data: jsonToken,
         };
       } else {
         response.status = 409;

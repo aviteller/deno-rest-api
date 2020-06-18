@@ -177,13 +177,15 @@ class DB {
     return returnObj;
   };
 
-  getOne = async (id: string) => {
+  getOne = async (id: string, deleted?: boolean) => {
     let response: any = new Object();
     try {
       await client.connect();
+      
+      let searchDeleted = deleted ? "is not" : "is";
 
       const result = await client.query(
-        `SELECT * FROM ${this.table} WHERE id = $1`,
+        `SELECT * FROM ${this.table} WHERE id = $1 AND deleted_at ${searchDeleted} null`,
         id
       );
 
@@ -218,13 +220,15 @@ class DB {
     return response;
   };
 
-  getOneByValue = async (field: string, value: string) => {
+  getOneByValue = async (field: string, value: string, deleted?: boolean) => {
     let response: any = new Object();
     try {
       await client.connect();
 
+      let searchDeleted = deleted ? "is not" : "is";
+
       const result = await client.query(
-        `SELECT * FROM ${this.table} WHERE ${field} = $1 AND deleted_at is null`,
+        `SELECT * FROM ${this.table} WHERE ${field} = $1 AND deleted_at ${searchDeleted} null`,
         value
       );
 
