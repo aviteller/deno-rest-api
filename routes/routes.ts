@@ -8,11 +8,11 @@ import {
 } from "../controllers/products.ts";
 
 import { UserController } from "../controllers/users.ts";
-
+import { oakCors } from "https://deno.land/x/cors/mod.ts";
 import { validJwt } from "../middleware/jwt.ts";
 const userController = new UserController();
 
-import { register, login } from "../controllers/auth.ts";
+import { register, login, me } from "../controllers/auth.ts";
 const router = new Router();
 
 router
@@ -31,6 +31,7 @@ router
 
 router
   .post("/api/v1/auth/register", register)
+  .get("/api/v1/auth/me",  me)
   .post("/api/v1/auth/login", login);
 
 export default router;

@@ -38,8 +38,7 @@ const validateToken = async (token: string) => {
   return await validateJwt(token, JwtConfig.secretKey);
 };
 
-const fetchUserByToken = (token: string) => {
-  return validateJwtObject(parseAndDecode(token)).payload;
-};
+const fetchUserByToken = async (token: string) =>
+  await validateJwtObject(parseAndDecode(token)).payload;
 
 export { createToken, validateToken, fetchUserByToken, JwtConfig };

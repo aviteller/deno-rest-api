@@ -1,5 +1,5 @@
 import { User, IUser } from "../models/users.ts";
-import { createToken } from "../util/token.ts";
+import { createToken, fetchUserByToken, JwtConfig } from "../util/token.ts";
 
 const userModel = new User();
 
@@ -94,4 +94,25 @@ const login = async ({
   }
 };
 
-export { register, login };
+const me = async ({ request, response }: { request: any; response: any }) => {
+  const token = request.headers
+    .get(JwtConfig.header)
+    ?.replace(`${JwtConfig.schema} `, "");
+  console.log(token);
+  const tokenUser = await fetchUserByToken(token);
+  console.log(tokenUser);
+  if (tokenUser) {
+    const res = await userModel.getUser(tokenUser.id);
+
+    response.status = res.status;
+    response.body = res.body;
+  } else {
+    response.status = 409;
+    response.body = {
+      success: false,
+      msg: `No User found`,
+    };
+  }
+};
+
+export { register, login, me };
