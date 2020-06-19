@@ -1,11 +1,13 @@
 import { Client } from "https://deno.land/x/postgres/mod.ts";
 import { dbCreds } from "../config.ts";
+import { helpers } from "https://deno.land/x/oak/mod.ts";
 
 //init client
 const client = new Client(dbCreds);
 
 class DB {
   table?: string;
+  owner?: any;
 
   sortBy = (queryParams: any): string => {
     let { sort } = queryParams;
@@ -94,9 +96,9 @@ class DB {
     return returnObj;
   };
 
-  getAll = async (queryParams?: any) => {
+  getAll = async (ctx: any, joinOwner?: boolean) => {
     let response: any = new Object();
-
+    let queryParams = helpers.getQuery(ctx);
     let { select } = queryParams;
 
     try {
@@ -112,19 +114,45 @@ class DB {
 
       const pageAndLimitObject = await this.getPageAndLimit(queryParams);
 
-      const finalQuery = `SELECT ${selectFields} FROM ${this.table} WHERE deleted_at ${deleted} null ${searchByString} ${orderBy} ${pageAndLimitObject.pageStr}`;
+      const join = joinOwner
+        ? ` JOIN (SELECT ${this.owner.fields} FROM  ${this.owner.table}) ${this.owner.alias} ON ${this.table}.${this.owner.id} = ${this.owner.alias}.id`
+        : "";
+
+      const finalQuery = `SELECT ${selectFields} FROM ${this.table} ${join} WHERE ${this.table}.deleted_at ${deleted} null ${searchByString} ${orderBy} ${pageAndLimitObject.pageStr}`;
+
+      console.log(finalQuery);
 
       const result = await client.query(finalQuery);
+
+      // console.log(result)
 
       const resObj: any = new Object();
 
       const resultsArray: Array<Object> = new Array();
 
+      const usedArrayValues: Array<Object> = new Array();
+      let orignalTableOid: number = 0;
+      let j = 0
       result.rows.map((p) => {
         let obj: any = new Object();
-        result.rowDescription.columns.map((el, i) => (obj[el.name] = p[i]));
+        let ownerObj: any = new Object();
+        result.rowDescription.columns.map((el, i) => {
+          if (orignalTableOid === 0) {
+            orignalTableOid = el.tableOid;
+
+            obj[el.name] = p[i];
+          } else if (el.tableOid === orignalTableOid) {
+            obj[el.name] = p[i];
+          } else {
+            obj.owner[j++] = {field:el.name,value:p[i]}
+            // // ownerObj[el.name] = p[i];
+            // obj.ownerObj[el.name] = p[i];
+          }
+        
+        });
         resultsArray.push(obj);
       });
+      // console.log(usedArrayValues);
 
       const total = await this.totalRows(
         searchByString,
@@ -181,7 +209,7 @@ class DB {
     let response: any = new Object();
     try {
       await client.connect();
-      
+
       let searchDeleted = deleted ? "is not" : "is";
 
       const result = await client.query(
@@ -420,12 +448,35 @@ class DB {
   deleteOne = async (id: string) => {
     let response: any = new Object();
     let res = await this.getOne(id);
+
     if (res.status === 404) {
-      response.status = 404;
-      response.body = {
-        success: false,
-        msg: response.body.msg,
-      };
+      let resDeleted = await this.getOne(id, true);
+
+      if (resDeleted.status === 404) {
+        response.status = resDeleted.status;
+        response.body = resDeleted.body;
+      } else {
+        try {
+          await client.connect();
+
+          await client.query(`DELETE FROM ${this.table} WHERE id = $1`, id);
+
+          response.status = 200;
+          response.body = {
+            success: true,
+            msg: `${this.table} with id ${id} PermaDeleted`,
+          };
+        } catch (error) {
+          response.status = 500;
+          response.body = {
+            success: false,
+            msg: error.toString(),
+          };
+        } finally {
+          await client.end();
+        }
+      }
+
       return response;
     } else {
       try {

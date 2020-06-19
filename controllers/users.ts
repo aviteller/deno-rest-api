@@ -1,4 +1,4 @@
-import { IUser, User } from "../models/users.ts";
+import { IUser, User } from "../models/User.ts";
 import { helpers } from "https://deno.land/x/oak/mod.ts";
 
 const userModel = new User();
@@ -7,9 +7,10 @@ export class UserController {
   // @desc Get All Users
   // @ route GET /api/v1/users
   getUsers = async (ctx: any) => {
-    let queryParams = helpers.getQuery(ctx);
-    let results = await userModel.getUsers(queryParams);
-    
+   
+
+    let results = await userModel.getUsers(ctx);
+
     ctx.response.status = results.status;
     ctx.response.body = results.body;
   };
@@ -43,6 +44,7 @@ export class UserController {
     } else {
       if (await userModel.validate(body.value)) {
         const { name, email, password, role } = body.value;
+
         const user: IUser = {
           name,
           email,

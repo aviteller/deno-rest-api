@@ -1,12 +1,5 @@
 import { DB } from "../helpers/DB.ts";
 import * as bcrypt from "https://deno.land/x/bcrypt/mod.ts";
-import {
-  makeJwt,
-  setExpiration,
-  Jose,
-  Payload,
-} from "https://deno.land/x/djwt/create.ts";
-import { validJwt } from "../middleware/jwt.ts";
 
 export interface IUser {
   id?: string;
@@ -18,6 +11,7 @@ export interface IUser {
 
 export class User extends DB {
   table = "users";
+  
   //make function in higher class
   validate(values: any) {
     if (
@@ -66,6 +60,6 @@ export class User extends DB {
   }
 
   async deleteUser(id: any) {
-    return await this.deleteOne("id");
+    return await this.deleteOne(id);
   }
 }

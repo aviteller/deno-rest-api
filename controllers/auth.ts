@@ -1,4 +1,4 @@
-import { User, IUser } from "../models/users.ts";
+import { User, IUser } from "../models/User.ts";
 import { createToken, fetchUserByToken, JwtConfig } from "../util/token.ts";
 
 const userModel = new User();
@@ -30,6 +30,14 @@ const register = async ({
       let result = await userModel.addUser(body.value);
       const newUser: IUser = result.body.data;
       const jsonToken = await createToken(newUser);
+      
+      let userToSend = {
+        name: newUser.name,
+        email: newUser.email,
+        role: newUser.role,
+        jsonToken,
+      };
+
       response.status = result.status;
       response.body = { success: true, data: jsonToken };
     } else {
@@ -72,10 +80,18 @@ const login = async ({
       if (isMatch) {
         const jsonToken = await createToken(user);
 
+        let userToSend = {
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          jsonToken,
+        };
+
+
         response.status = 200;
         response.body = {
           success: true,
-          data: jsonToken,
+          data: userToSend,
         };
       } else {
         response.status = 409;
@@ -98,9 +114,9 @@ const me = async ({ request, response }: { request: any; response: any }) => {
   const token = request.headers
     .get(JwtConfig.header)
     ?.replace(`${JwtConfig.schema} `, "");
-  console.log(token);
+
   const tokenUser = await fetchUserByToken(token);
-  console.log(tokenUser);
+
   if (tokenUser) {
     const res = await userModel.getUser(tokenUser.id);
 
