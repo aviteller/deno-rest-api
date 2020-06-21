@@ -162,17 +162,9 @@ class DB {
       resObj.count = result.rowCount;
       resObj.rows = resultsArray;
 
-      response.staus = 200;
-      response.body = {
-        success: true,
-        data: resObj,
-      };
+      return resObj;
     } catch (error) {
-      response.status = 500;
-      response.body = {
-        success: false,
-        msg: error.toString(),
-      };
+      response.error = error.toString();
     } finally {
       await client.end();
     }
@@ -206,7 +198,7 @@ class DB {
 
   getAllByValue = async (field: string, value: string, deleted?: boolean) => {
     let response: any = new Object();
-    console.log(`SELECT * FROM ${this.table} WHERE ${field} = $1 `);
+
     let result: any;
     try {
       try {
@@ -218,7 +210,7 @@ class DB {
           value
         );
       } catch (error) {
-        console.log(error);
+        response.error = error.toString();
       }
 
       if (result.rows.toString() === "") {
@@ -237,10 +229,12 @@ class DB {
         return resObj;
       }
     } catch (error) {
-      return error;
+      response.error = error.toString();
     } finally {
       await client.end();
     }
+
+    return response;
   };
 
   getOne = async (id: string, deleted?: boolean) => {
@@ -256,29 +250,17 @@ class DB {
       );
 
       if (result.rows.toString() === "") {
-        response.status = 404;
-        response.body = {
-          success: false,
-          msg: "No data found",
-        };
+        response.error = "No rows";
         return response;
       } else {
         const resObj: any = new Object();
         result.rows.map((p) =>
           result.rowDescription.columns.map((el, i) => (resObj[el.name] = p[i]))
         );
-        response.status = 200;
-        response.body = {
-          success: true,
-          data: resObj,
-        };
+        return resObj;
       }
     } catch (error) {
-      response.status = 500;
-      response.body = {
-        success: false,
-        msg: error.toString(),
-      };
+      response.error = error.toString();
     } finally {
       await client.end();
     }
@@ -299,29 +281,17 @@ class DB {
       );
 
       if (result.rows.toString() === "") {
-        response.status = 404;
-        response.body = {
-          success: false,
-          msg: "No data found",
-        };
+        response.error = "no data found";
         return response;
       } else {
         const resObj: any = new Object();
         result.rows.map((p) =>
           result.rowDescription.columns.map((el, i) => (resObj[el.name] = p[i]))
         );
-        response.status = 200;
-        response.body = {
-          success: true,
-          data: resObj,
-        };
+        return resObj;
       }
     } catch (error) {
-      response.status = 500;
-      response.body = {
-        success: false,
-        msg: error.toString(),
-      };
+      response.error = error.toString();
     } finally {
       await client.end();
     }
@@ -337,29 +307,18 @@ class DB {
       const result = await client.query(query);
 
       if (result.rows.toString() === "") {
-        response.status = 404;
-        response.body = {
-          success: false,
-          msg: "No data found",
-        };
+        response.error = 404;
+
         return response;
       } else {
         const resObj: any = new Object();
         result.rows.map((p) =>
           result.rowDescription.columns.map((el, i) => (resObj[el.name] = p[i]))
         );
-        response.status = 200;
-        response.body = {
-          success: true,
-          data: resObj,
-        };
+        return resObj;
       }
     } catch (error) {
-      response.status = 500;
-      response.body = {
-        success: false,
-        msg: error.toString(),
-      };
+      response.error = error.toString();
     } finally {
       await client.end();
     }
@@ -370,12 +329,8 @@ class DB {
   updateOne = async (values: any, id: string) => {
     let response: any = new Object();
     let res = await this.getOne(id);
-    if (res.status === 404) {
-      response.status = 404;
-      response.body = {
-        success: false,
-        msg: response.body.msg,
-      };
+    if (res.error) {
+      response.error = res.error;
       return response;
     } else {
       const updatedColumns = new Array();
@@ -402,25 +357,13 @@ class DB {
         );
 
         if (result.rows.toString() === "") {
-          response.status = 404;
-          response.body = {
-            success: false,
-            msg: "No data found",
-          };
+          response.error = "No data found";
           return response;
         } else {
-          response.status = 201;
-          response.body = {
-            success: true,
-            data: resObj,
-          };
+          return resObj;
         }
       } catch (error) {
-        response.status = 500;
-        response.body = {
-          success: false,
-          msg: error.toString(),
-        };
+        response.error = error.toString();
       } finally {
         await client.end();
       }
@@ -457,25 +400,13 @@ class DB {
       );
 
       if (result.rows.toString() === "") {
-        response.status = 404;
-        response.body = {
-          success: false,
-          msg: "No data found",
-        };
+        response.error = "no data";
         return response;
       } else {
-        response.status = 201;
-        response.body = {
-          success: true,
-          data: resObj,
-        };
+        return resObj;
       }
     } catch (error) {
-      response.status = 500;
-      response.body = {
-        success: false,
-        msg: error.toString(),
-      };
+      response.error = error.toString();
     } finally {
       await client.end();
     }
@@ -487,29 +418,21 @@ class DB {
     let response: any = new Object();
     let res = await this.getOne(id);
 
-    if (res.status === 404) {
+    if (res.error) {
       let resDeleted = await this.getOne(id, true);
 
-      if (resDeleted.status === 404) {
-        response.status = resDeleted.status;
-        response.body = resDeleted.body;
+      if (resDeleted.error) {
+        response.error = "no data found";
+        return response;
       } else {
         try {
           await client.connect();
 
           await client.query(`DELETE FROM ${this.table} WHERE id = $1`, id);
 
-          response.status = 200;
-          response.body = {
-            success: true,
-            msg: `${this.table} with id ${id} PermaDeleted`,
-          };
+          return `${this.table} with id ${id} PermaDeleted`;
         } catch (error) {
-          response.status = 500;
-          response.body = {
-            success: false,
-            msg: error.toString(),
-          };
+          response.error = error.toString();
         } finally {
           await client.end();
         }
@@ -529,17 +452,9 @@ class DB {
           await client.query(`DELETE FROM ${this.table} WHERE id = $1`, id);
         }
 
-        response.status = 200;
-        response.body = {
-          success: true,
-          msg: `${this.table} with id ${id} Removed`,
-        };
+        return `${this.table} with id ${id} Removed`;
       } catch (error) {
-        response.status = 500;
-        response.body = {
-          success: false,
-          msg: error.toString(),
-        };
+        response.error = error.toString();
       } finally {
         await client.end();
       }

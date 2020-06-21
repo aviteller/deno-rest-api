@@ -34,7 +34,7 @@ router
     "/api/v1/companies",
     // protect,
     // authorize("admin", "company"),
-    companyController.getCompaniesWithChildren
+    companyController.getCompaniesWithJobs
   )
   .get(
     "/api/v1/companies/:id",
