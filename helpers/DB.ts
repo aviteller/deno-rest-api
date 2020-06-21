@@ -7,7 +7,9 @@ const client = new Client(dbCreds);
 
 class DB {
   table?: string;
-  owner?: any;
+  belongsTo?: any;
+  hasOne?: any;
+  hasMany?: any;
 
   sortBy = (queryParams: any): string => {
     let { sort } = queryParams;
@@ -114,45 +116,43 @@ class DB {
 
       const pageAndLimitObject = await this.getPageAndLimit(queryParams);
 
-      const join = joinOwner
-        ? ` JOIN (SELECT ${this.owner.fields} FROM  ${this.owner.table}) ${this.owner.alias} ON ${this.table}.${this.owner.id} = ${this.owner.alias}.id`
+      let join = joinOwner
+        ? ` JOIN (SELECT ${this.belongsTo.fields || "*"} FROM  ${
+            this.belongsTo.table
+          }) ${this.belongsTo.alias} ON ${this.table}.${
+            this.belongsTo.selector
+          } = ${this.belongsTo.alias}.id`
         : "";
 
-      const finalQuery = `SELECT ${selectFields} FROM ${this.table} ${join} WHERE ${this.table}.deleted_at ${deleted} null ${searchByString} ${orderBy} ${pageAndLimitObject.pageStr}`;
-
+      const finalQuery = `SELECT ${selectFields} FROM ${this.table} ${join}  WHERE ${this.table}.deleted_at ${deleted} null ${searchByString} ${orderBy} GROUP BY ${this.table}.id ${pageAndLimitObject.pageStr} `;
       console.log(finalQuery);
-
       const result = await client.query(finalQuery);
-
-      // console.log(result)
+      console.log(result);
 
       const resObj: any = new Object();
 
       const resultsArray: Array<Object> = new Array();
 
-      const usedArrayValues: Array<Object> = new Array();
       let orignalTableOid: number = 0;
-      let j = 0
+
+      let j = 0;
+
       result.rows.map((p) => {
         let obj: any = new Object();
         let ownerObj: any = new Object();
         result.rowDescription.columns.map((el, i) => {
           if (orignalTableOid === 0) {
             orignalTableOid = el.tableOid;
-
             obj[el.name] = p[i];
           } else if (el.tableOid === orignalTableOid) {
             obj[el.name] = p[i];
           } else {
-            obj.owner[j++] = {field:el.name,value:p[i]}
-            // // ownerObj[el.name] = p[i];
-            // obj.ownerObj[el.name] = p[i];
+            ownerObj[el.name] = p[i];
+            obj.owner = ownerObj;
           }
-        
         });
         resultsArray.push(obj);
       });
-      // console.log(usedArrayValues);
 
       const total = await this.totalRows(
         searchByString,
@@ -203,6 +203,56 @@ class DB {
     }
 
     return returnObj;
+  };
+
+  getAllByValue = async (field: string, value: string, deleted?: boolean) => {
+    let response: any = new Object();
+    try {
+      await client.connect();
+
+      let searchDeleted = deleted ? "is not" : "is";
+
+      const result = await client.query(
+        `SELECT * FROM ${this.table} WHERE ${field} = $1 AND deleted_at ${searchDeleted} null`,
+        value
+      );
+
+      if (result.rows.toString() === "") {
+        response.status = 404;
+        response.body = {
+          success: false,
+          msg: "No data found",
+        };
+        return response;
+      } else {
+        const resObj: any = new Object();
+        const resultsArray: Array<Object> = new Array();
+        result.rows.map((p) => {
+          let obj: any = new Object();
+          // let ownerObj: any = new Object();
+          result.rowDescription.columns.map((el, i) => {
+            obj[el.name] = p[i];
+          });
+          resultsArray.push(obj);
+        });
+        resObj.rows = resultsArray;
+        response.status = 200;
+        response.body = {
+          success: true,
+          data: resObj,
+        };
+      }
+    } catch (error) {
+      response.status = 500;
+      response.body = {
+        success: false,
+        msg: error.toString(),
+      };
+    } finally {
+      await client.end();
+    }
+
+    return response;
   };
 
   getOne = async (id: string, deleted?: boolean) => {

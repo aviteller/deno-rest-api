@@ -29,6 +29,20 @@ export class CompanyController {
     response.status = results.status;
     response.body = results.body;
   };
+  // @desc Get Single Companys
+  // @ route GET /api/v1/companies/:id
+
+  getCompanyWithDetails = async ({
+    params,
+    response,
+  }: {
+    params: { id: string };
+    response: any;
+  }) => {
+    let results = await companyModel.getCompanyWithDetails(params.id);
+    response.status = results.status;
+    response.body = results.body;
+  };
 
   // @desc Add Companys
   // @ route POST /api/v1/companies

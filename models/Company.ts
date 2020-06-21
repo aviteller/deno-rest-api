@@ -1,5 +1,5 @@
 import { DB } from "../helpers/DB.ts";
-import * as bcrypt from "https://deno.land/x/bcrypt/mod.ts";
+import { Job } from "./Job.ts";
 
 export interface ICompany {
   id?: string;
@@ -26,7 +26,19 @@ export interface ICompany {
 
 export class Company extends DB {
   table = "companies";
-  owner = { id: "user_id", alias: "u", table: "users", fields: "id,name" };
+
+  belongsTo = {
+    selector: "user_id",
+    alias: "u",
+    table: "users",
+    fields: "id,name",
+  };
+
+  hasMany = {
+    table: "jobs",
+    alias: "j",
+    selector: "company_id",
+  };
   //make function in higher class
   validate(values: any) {
     if ("name" in values) {
@@ -36,8 +48,24 @@ export class Company extends DB {
     }
   }
 
+  async getCompanyWithDetails(id: any) {
+    const returnCompany = await this.getOne(id);
+    const jobModel = new Job();
+    const jobs = await jobModel.getJobsByCompanyID(id);
+    const returnObj = {
+      status: 200,
+      body: {
+        success: true,
+        data: { company: returnCompany.body.data, jobs: jobs.body.data.rows },
+      },
+    };
+
+    return returnObj;
+  }
   async getCompany(id: any) {
-    return await this.getOne(id);
+    const returnCompany = await this.getOne(id);
+
+    return returnCompany;
   }
 
   async getCompanyByValue(field: string, value: any) {
