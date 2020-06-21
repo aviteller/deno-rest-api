@@ -124,10 +124,9 @@ class DB {
           } = ${this.belongsTo.alias}.id`
         : "";
 
-      const finalQuery = `SELECT ${selectFields} FROM ${this.table} ${join}  WHERE ${this.table}.deleted_at ${deleted} null ${searchByString} ${orderBy} GROUP BY ${this.table}.id ${pageAndLimitObject.pageStr} `;
+      const finalQuery = `SELECT ${selectFields} FROM ${this.table} ${join}  WHERE ${this.table}.deleted_at ${deleted} null ${searchByString} ${orderBy} ${pageAndLimitObject.pageStr} `;
       console.log(finalQuery);
       const result = await client.query(finalQuery);
-      console.log(result);
 
       const resObj: any = new Object();
 
@@ -207,52 +206,41 @@ class DB {
 
   getAllByValue = async (field: string, value: string, deleted?: boolean) => {
     let response: any = new Object();
+    console.log(`SELECT * FROM ${this.table} WHERE ${field} = $1 `);
+    let result: any;
     try {
-      await client.connect();
+      try {
+        await client.connect();
 
-      let searchDeleted = deleted ? "is not" : "is";
-
-      const result = await client.query(
-        `SELECT * FROM ${this.table} WHERE ${field} = $1 AND deleted_at ${searchDeleted} null`,
-        value
-      );
+        let searchDeleted = deleted ? "is not" : "is";
+        result = await client.query(
+          `SELECT * FROM ${this.table} WHERE ${field} = $1 AND deleted_at ${searchDeleted} null`,
+          value
+        );
+      } catch (error) {
+        console.log(error);
+      }
 
       if (result.rows.toString() === "") {
-        response.status = 404;
-        response.body = {
-          success: false,
-          msg: "No data found",
-        };
-        return response;
+        return 0;
       } else {
         const resObj: any = new Object();
         const resultsArray: Array<Object> = new Array();
-        result.rows.map((p) => {
+        result.rows.map((p: any) => {
           let obj: any = new Object();
-          // let ownerObj: any = new Object();
-          result.rowDescription.columns.map((el, i) => {
-            obj[el.name] = p[i];
-          });
+          result.rowDescription.columns.map(
+            (el: any, i: any) => (obj[el.name] = p[i])
+          );
           resultsArray.push(obj);
         });
         resObj.rows = resultsArray;
-        response.status = 200;
-        response.body = {
-          success: true,
-          data: resObj,
-        };
+        return resObj;
       }
     } catch (error) {
-      response.status = 500;
-      response.body = {
-        success: false,
-        msg: error.toString(),
-      };
+      return error;
     } finally {
       await client.end();
     }
-
-    return response;
   };
 
   getOne = async (id: string, deleted?: boolean) => {

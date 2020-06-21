@@ -14,6 +14,15 @@ export class CompanyController {
     ctx.response.status = results.status;
     ctx.response.body = results.body;
   };
+  // @desc Get All Companys
+  // @ route GET /api/v1/companies
+  getCompaniesWithChildren = async (ctx: any) => {
+    // let queryParams = helpers.getQuery(ctx);
+    let results = await companyModel.getCompaniesWithChildren(ctx);
+    
+    ctx.response.status = results.status;
+    ctx.response.body = results.body;
+  };
 
   // @desc Get Single Companys
   // @ route GET /api/v1/companies/:id

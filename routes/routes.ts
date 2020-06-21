@@ -34,7 +34,7 @@ router
     "/api/v1/companies",
     // protect,
     // authorize("admin", "company"),
-    companyController.getCompanies
+    companyController.getCompaniesWithChildren
   )
   .get(
     "/api/v1/companies/:id",
@@ -44,8 +44,8 @@ router
   )
   .post(
     "/api/v1/companies",
-    protect,
-    authorize("admin", "company"),
+    // protect,
+    // authorize("admin", "company"),
     companyController.addCompany
   )
   .put(

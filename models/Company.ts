@@ -1,5 +1,6 @@
 import { DB } from "../helpers/DB.ts";
 import { Job } from "./Job.ts";
+const jobModel = new Job();
 
 export interface ICompany {
   id?: string;
@@ -50,7 +51,7 @@ export class Company extends DB {
 
   async getCompanyWithDetails(id: any) {
     const returnCompany = await this.getOne(id);
-    const jobModel = new Job();
+
     const jobs = await jobModel.getJobsByCompanyID(id);
     const returnObj = {
       status: 200,
@@ -74,6 +75,28 @@ export class Company extends DB {
 
   async getCompanies(queryParams: any) {
     return await this.getAll(queryParams, true);
+  }
+  async getCompaniesWithChildren(queryParams: any) {
+    let companies = await this.getAll(queryParams, true);
+
+    companies = await companies.body.data.rows;
+
+    for await (const company of companies) {
+      let jobs = await jobModel.getJobsByCompanyID(company.id.toString());
+      company.jobs = jobs.rows;
+    }
+
+    // await companies.forEach(async (company: any) => {
+
+    //   let jobs = await jobModel.getJobsByCompanyID(company.id.toString());
+
+    //   // if (jobs.body.data.rows && jobs.body.data.rows > 0)
+    //   //   company.jobs = jobs.body.data.rows;
+    // });
+    return {
+      status: 200,
+      body: { success: true, data: companies },
+    };
   }
 
   async addCompany(values: any) {

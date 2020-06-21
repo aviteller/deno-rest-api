@@ -41,6 +41,7 @@ export class Job extends DB {
   }
 
   async getJobsByCompanyID(id: any) {
+      console.log(`here ${id}`)
     return await this.getAllByValue("company_id", id);
   }
 
