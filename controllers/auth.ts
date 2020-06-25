@@ -25,10 +25,11 @@ const register = async ({
     const { email } = body.value;
 
     const userExists = await userModel.getUserByValue("email", email);
+    console.log(userExists)
 
-    if (userExists.body.success === false) {
+    if (!userExists) {
       let result = await userModel.addUser(body.value);
-      const newUser: IUser = result.body.data;
+      const newUser: IUser = result;
       const jsonToken = await createToken(newUser);
       
       let userToSend = {
@@ -39,7 +40,7 @@ const register = async ({
       };
 
       response.status = result.status;
-      response.body = { success: true, data: jsonToken };
+      response.body = { success: true, data: userToSend };
     } else {
       response.status = 409;
       response.body = {
@@ -71,9 +72,9 @@ const login = async ({
     const { email, password } = body.value;
 
     let user = await userModel.getUserByValue("email", email);
-
-    if (user.body.success === true) {
-      user = user.body.data;
+    // console.log(user)d
+    if (user) {
+      // user = user.body.data;
 
       let isMatch = await userModel.passwordMatch(password, user.password);
 

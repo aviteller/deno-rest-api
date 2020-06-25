@@ -1,5 +1,6 @@
 import { DB } from "../helpers/DB.ts";
 
+import { HttpError } from "https://deno.land/x/oak/mod.ts";
 export interface IJob {
   id?: string;
   user_id?: number;
@@ -41,7 +42,6 @@ export class Job extends DB {
   }
 
   async getJobsByCompanyID(id: any) {
-      console.log(`here ${id}`)
     return await this.getAllByValue("company_id", id);
   }
 

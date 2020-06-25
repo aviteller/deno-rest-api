@@ -1,6 +1,7 @@
 import { Client } from "https://deno.land/x/postgres/mod.ts";
 import { dbCreds } from "../config.ts";
 import { helpers } from "https://deno.land/x/oak/mod.ts";
+import { ErrorResponse } from "../util/errorResponse.ts";
 
 //init client
 const client = new Client(dbCreds);
@@ -16,9 +17,9 @@ class DB {
     let retrunStr: string = "";
     if (sort !== undefined) {
       if (sort.charAt(0) === "-") {
-        retrunStr = ` ORDER BY ${sort.substring(1)} DESC`;
+        retrunStr = ` ORDER BY ${this.table}.${sort.substring(1)} DESC`;
       } else {
-        retrunStr = ` ORDER BY ${sort} ASC`;
+        retrunStr = ` ORDER BY ${this.table}.${sort} ASC`;
       }
     } else {
       ` ORDER BY created_at ASC `;
@@ -80,16 +81,16 @@ class DB {
   } => {
     let { page, limit } = queryParams;
     const returnObj: any = new Object();
-    const startPage: number = page !== undefined ? page : 1;
+    const startPage: any = page !== undefined ? page : 1;
     const pageLimit: number = limit !== undefined ? limit : 10;
 
-    // const startIndex = (startPage - 1) * pageLimit;
-    // const endIndex = startPage * pageLimit;
     let startIndex = (startPage - 1) * pageLimit;
     returnObj.endIndex = startPage * pageLimit;
     returnObj.page = startPage;
     returnObj.limit = pageLimit;
-    if (limit !== "max") {
+
+    
+    if (startPage !== "All") {
       returnObj.pageStr = `LIMIT ${pageLimit} OFFSET ${startIndex}`;
     } else {
       returnObj.pageStr = `LIMIT 500`;
@@ -101,7 +102,7 @@ class DB {
   getAll = async (ctx: any, joinOwner?: boolean) => {
     let response: any = new Object();
     let queryParams = helpers.getQuery(ctx);
-    let { select } = queryParams;
+    let { select, sort } = queryParams;
 
     try {
       await client.connect();
@@ -125,7 +126,7 @@ class DB {
         : "";
 
       const finalQuery = `SELECT ${selectFields} FROM ${this.table} ${join}  WHERE ${this.table}.deleted_at ${deleted} null ${searchByString} ${orderBy} ${pageAndLimitObject.pageStr} `;
-      console.log(finalQuery);
+
       const result = await client.query(finalQuery);
 
       const resObj: any = new Object();
@@ -133,8 +134,6 @@ class DB {
       const resultsArray: Array<Object> = new Array();
 
       let orignalTableOid: number = 0;
-
-      let j = 0;
 
       result.rows.map((p) => {
         let obj: any = new Object();
@@ -161,10 +160,11 @@ class DB {
       resObj.pagination = await this.pagination(pageAndLimitObject, total);
       resObj.count = result.rowCount;
       resObj.rows = resultsArray;
+      resObj.sortBy = sort
 
       return resObj;
     } catch (error) {
-      response.error = error.toString();
+      throw new ErrorResponse(error.toString(), 404);
     } finally {
       await client.end();
     }
@@ -187,6 +187,7 @@ class DB {
       returnObj.currentPage = +pageObj.page;
       returnObj.totalPages = Math.ceil(total / pageObj.limit);
       returnObj.totalRows = total;
+      returnObj.limit = pageObj.limit;
 
       if (pageObj.endIndex < total) {
         returnObj.nextPage = +pageObj.page + 1;
@@ -210,7 +211,7 @@ class DB {
           value
         );
       } catch (error) {
-        response.error = error.toString();
+        throw new ErrorResponse(error.toString(), 404);
       }
 
       if (result.rows.toString() === "") {
@@ -229,7 +230,7 @@ class DB {
         return resObj;
       }
     } catch (error) {
-      response.error = error.toString();
+      throw new ErrorResponse(error.toString(), 404);
     } finally {
       await client.end();
     }
@@ -250,8 +251,7 @@ class DB {
       );
 
       if (result.rows.toString() === "") {
-        response.error = "No rows";
-        return response;
+        throw new ErrorResponse("No rows found", 404);
       } else {
         const resObj: any = new Object();
         result.rows.map((p) =>
@@ -260,7 +260,7 @@ class DB {
         return resObj;
       }
     } catch (error) {
-      response.error = error.toString();
+      throw new ErrorResponse(error.toString(), 404);
     } finally {
       await client.end();
     }
@@ -269,7 +269,6 @@ class DB {
   };
 
   getOneByValue = async (field: string, value: string, deleted?: boolean) => {
-    let response: any = new Object();
     try {
       await client.connect();
 
@@ -281,8 +280,7 @@ class DB {
       );
 
       if (result.rows.toString() === "") {
-        response.error = "no data found";
-        return response;
+        return false;
       } else {
         const resObj: any = new Object();
         result.rows.map((p) =>
@@ -291,12 +289,10 @@ class DB {
         return resObj;
       }
     } catch (error) {
-      response.error = error.toString();
+      throw new ErrorResponse(error.toString(), 404);
     } finally {
       await client.end();
     }
-
-    return response;
   };
 
   customQuery = async (query: string) => {
@@ -307,9 +303,7 @@ class DB {
       const result = await client.query(query);
 
       if (result.rows.toString() === "") {
-        response.error = 404;
-
-        return response;
+        throw new ErrorResponse("Resource could not be found", 404);
       } else {
         const resObj: any = new Object();
         result.rows.map((p) =>
@@ -318,7 +312,7 @@ class DB {
         return resObj;
       }
     } catch (error) {
-      response.error = error.toString();
+      throw new ErrorResponse(error.toString(), 404);
     } finally {
       await client.end();
     }
@@ -357,13 +351,12 @@ class DB {
         );
 
         if (result.rows.toString() === "") {
-          response.error = "No data found";
-          return response;
+          throw new ErrorResponse("Error updating", 404);
         } else {
           return resObj;
         }
       } catch (error) {
-        response.error = error.toString();
+        throw new ErrorResponse(error.toString(), 404);
       } finally {
         await client.end();
       }
@@ -400,13 +393,12 @@ class DB {
       );
 
       if (result.rows.toString() === "") {
-        response.error = "no data";
-        return response;
+        throw new ErrorResponse("Error adding tow", 404);
       } else {
         return resObj;
       }
     } catch (error) {
-      response.error = error.toString();
+      throw new ErrorResponse(error.toString(), 404);
     } finally {
       await client.end();
     }
@@ -422,8 +414,7 @@ class DB {
       let resDeleted = await this.getOne(id, true);
 
       if (resDeleted.error) {
-        response.error = "no data found";
-        return response;
+        throw new ErrorResponse("Shouldnt have made it here", 404);
       } else {
         try {
           await client.connect();
@@ -432,7 +423,7 @@ class DB {
 
           return `${this.table} with id ${id} PermaDeleted`;
         } catch (error) {
-          response.error = error.toString();
+          throw new ErrorResponse(error.toString(), 404);
         } finally {
           await client.end();
         }
@@ -454,7 +445,7 @@ class DB {
 
         return `${this.table} with id ${id} Removed`;
       } catch (error) {
-        response.error = error.toString();
+        throw new ErrorResponse(error.toString(), 404);
       } finally {
         await client.end();
       }

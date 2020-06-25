@@ -1,4 +1,5 @@
 import { DB } from "../helpers/DB.ts";
+import { makeResponse } from "../util/response.ts";
 import { Job } from "./Job.ts";
 const jobModel = new Job();
 
@@ -52,15 +53,8 @@ export class Company extends DB {
   async getCompanyWithDetails(id: any) {
     const returnCompany = await this.getOne(id);
     const jobs = await jobModel.getJobsByCompanyID(id);
-    const returnObj = {
-      status: 200,
-      body: {
-        success: true,
-        data: { company: returnCompany, jobs: jobs.rows },
-      },
-    };
 
-    return returnObj;
+    return  { company: returnCompany, jobs: jobs.rows };
   }
   async getCompany(id: any) {
     const returnCompany = await this.getOne(id);
@@ -77,7 +71,7 @@ export class Company extends DB {
   }
   async getCompaniesWithJobs(queryParams: any) {
     let companies = await this.getAll(queryParams, true);
-
+    
     if (companies.rows && companies.rows.length > 0) {
       for await (const company of companies.rows) {
         let jobs = await jobModel.getJobsByCompanyID(company.id.toString());
@@ -85,10 +79,9 @@ export class Company extends DB {
       }
     }
 
-    return {
-      status: 200,
-      body: { success: true, data: companies },
-    };
+    
+
+    return companies
   }
 
   async addCompany(values: any) {

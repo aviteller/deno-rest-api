@@ -1,7 +1,7 @@
 // import { ICompany, Company } from "../models/Company.ts";
 import { ICompany, Company } from "../models/Company.ts";
-import { helpers } from "https://deno.land/x/oak/mod.ts";
-
+import { ErrorResponse } from "../util/errorResponse.ts";
+import { makeResponse } from "../util/response.ts";
 const companyModel = new Company();
 
 export class CompanyController {
@@ -16,12 +16,14 @@ export class CompanyController {
   };
   // @desc Get All Companys
   // @ route GET /api/v1/companies
-  getCompaniesWithJobs = async (ctx: any) => {
+  getCompaniesWithJobs = async (ctx:any) => {
     // let queryParams = helpers.getQuery(ctx);
-    let results = await companyModel.getCompaniesWithJobs(ctx);
+
+
     
-    ctx.response.status = results.status;
-    ctx.response.body = results.body;
+
+    let results = await companyModel.getCompaniesWithJobs(ctx);
+    ctx.response = makeResponse(ctx, 200, true, results);
   };
 
   // @desc Get Single Companys
@@ -41,35 +43,19 @@ export class CompanyController {
   // @desc Get Single Companys
   // @ route GET /api/v1/companies/:id
 
-  getCompanyWithDetails = async ({
-    params,
-    response,
-  }: {
-    params: { id: string };
-    response: any;
-  }) => {
-    let results = await companyModel.getCompanyWithDetails(params.id);
-    response.status = results.status;
-    response.body = results.body;
+  getCompanyWithDetails = async (ctx: any) => {
+    let results = await companyModel.getCompanyWithDetails(ctx.params.id);
+
+    ctx.response = makeResponse(ctx, 200, true, results);
   };
 
   // @desc Add Companys
   // @ route POST /api/v1/companies
-  addCompany = async ({
-    request,
-    response,
-  }: {
-    request: any;
-    response: any;
-  }) => {
+  addCompany = async (ctx:any) => {
     // console.log(body.value);
-    const body = await request.body();
-    if (!request.hasBody) {
-      response.status = 400;
-      response.body = {
-        success: false,
-        msg: "No data found",
-      };
+    const body = await ctx.request.body();
+    if (!ctx.request.hasBody) {
+      throw new ErrorResponse("No data found", 400)
     } else {
       if (await companyModel.validate(body.value)) {
         const { name, user_id, ...values } = body.value;
@@ -78,32 +64,23 @@ export class CompanyController {
           name,
           user_id,
         };
-
+// console.log(company)
         company = { ...company, ...values };
 
-        console.log(company);
+   
         const companyExists = await companyModel.getCompanyByValue(
           "name",
           name
         );
-
-        if (companyExists.body.success === true) {
-          response.status = 404;
-          response.body = {
-            success: false,
-            msg: `Company with name: ${name} already exists`,
-          };
+        console.log(companyExists)
+        if (companyExists !== false) {
+          throw new ErrorResponse(`Company with name: ${name} already exists`, 404)
         } else {
           let result = await companyModel.addCompany(company);
-          response.status = result.status;
-          response.body = result.body;
+          ctx.response = makeResponse(ctx, 201, true, result);
         }
       } else {
-        response.status = 404;
-        response.body = {
-          success: false,
-          msg: "Please enter all required values",
-        };
+        throw new ErrorResponse("Please enter all required values", 404)
       }
     }
   };
@@ -122,11 +99,7 @@ export class CompanyController {
   }) => {
     const body = await request.body();
     if (!request.hasBody) {
-      response.status = 400;
-      response.body = {
-        success: false,
-        msg: "No data found",
-      };
+      throw new ErrorResponse("No data found", 400)
     } else {
       let result = await companyModel.updateCompany(body.value, params.id);
       response.status = result.status;

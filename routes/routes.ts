@@ -1,4 +1,4 @@
-import { Router } from "https://deno.land/x/oak/mod.ts";
+import { Router, send } from "https://deno.land/x/oak/mod.ts";
 
 import { UserController } from "../controllers/users.ts";
 import { CompanyController } from "../controllers/companies.ts";
@@ -11,6 +11,11 @@ const companyController = new CompanyController();
 const jobController = new JobController();
 
 const router = new Router();
+
+// router.get("/", (ctx) => {
+//   console.log(ctx)
+//   ctx.render("index.ejs", { data: { msg: "World" } });
+// });
 
 router
   .get("/api/v1/users", protect, authorize("admin"), userController.getUsers)
